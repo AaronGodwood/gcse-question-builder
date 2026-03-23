@@ -7,11 +7,13 @@ import AuthPage from '@/pages/AuthPage';
 const BuilderPage = lazy(() => import('@/pages/BuilderPage'));
 const QuestionsPage = lazy(() => import('@/pages/QuestionsPage'));
 const WorksheetsPage = lazy(() => import('@/pages/WorksheetsPage'));
+const StudentsPage = lazy(() => import('@/pages/StudentsPage'));
+const AdminPage = lazy(() => import('@/pages/AdminPage'));
 
 function PageLoader() {
   return (
     <div className="flex items-center justify-center h-full">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
     </div>
   );
 }
@@ -51,6 +53,22 @@ export default function App() {
             element={
               <Suspense fallback={<PageLoader />}>
                 <WorksheetsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="students"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <StudentsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="admin"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <AdminPage />
               </Suspense>
             }
           />

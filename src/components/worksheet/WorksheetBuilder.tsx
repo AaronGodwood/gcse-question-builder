@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   GripVertical, Trash2, Plus, Download, Save,
-  ChevronUp, ChevronDown, Settings, FileText,
+  ChevronUp, ChevronDown, Settings, FileText, UserCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { supabase } from '@/lib/supabase';
 import { useWorksheetStore } from '@/stores/worksheetStore';
 import { useWorksheet, useWorksheets } from '@/hooks/useWorksheet';
+import { useAuth, isSuperAdmin } from '@/hooks/useAuth';
+import { useMyTutees } from '@/hooks/useMyTutees';
+import { useWorksheetAssignments } from '@/hooks/useWorksheetAssignments';
 import { generateWorksheetPDF } from '@/lib/pdfExport';
 import type { Question } from '@/types/question';
 import type { WorksheetQuestionSettings } from '@/types/worksheet';
@@ -50,9 +53,13 @@ function BuilderTab() {
   const navigate = useNavigate();
   const store = useWorksheetStore();
   const { save, saving } = useWorksheet();
+  const { user, profile } = useAuth();
+  const superAdmin = isSuperAdmin(user);
+  const isTutor = superAdmin || profile?.role === 'tutor';
   const [questions, setQuestions] = useState<Record<string, Question>>({});
   const [showPicker, setShowPicker] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -154,6 +161,15 @@ function BuilderTab() {
               <Save className="h-3.5 w-3.5" />
               {saving ? 'Saving…' : 'Save'}
             </button>
+            {isTutor && store.currentId && (
+              <button
+                onClick={() => setShowAssign(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition-colors"
+              >
+                <UserCheck className="h-3.5 w-3.5" />
+                Assign
+              </button>
+            )}
             <button
               onClick={handleExport}
               disabled={exporting || store.questionIds.length === 0}
@@ -211,6 +227,9 @@ function BuilderTab() {
       {/* Modals */}
       {showPicker && <QuestionPicker onClose={() => setShowPicker(false)} />}
       {showSettings && <WorksheetSettingsModal onClose={() => setShowSettings(false)} />}
+      {showAssign && store.currentId && (
+        <AssignModal worksheetId={store.currentId} onClose={() => setShowAssign(false)} />
+      )}
     </div>
   );
 }
@@ -540,7 +559,7 @@ function SavedTab({ onLoad }: { onLoad: () => void }) {
           </div>
           <button
             onClick={async () => { await load(ws.id); onLoad(); }}
-            className="text-xs px-3 py-1 rounded-md bg-emerald-50 text-blue-700 hover:bg-blue-100 transition-colors"
+            className="text-xs px-3 py-1 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
           >
             Open
           </button>
@@ -552,6 +571,81 @@ function SavedTab({ onLoad }: { onLoad: () => void }) {
           </button>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── Assign worksheet modal ────────────────────────────────────────────────────
+
+function AssignModal({ worksheetId, onClose }: { worksheetId: string; onClose: () => void }) {
+  const { tutees, loading: loadingTutees } = useMyTutees();
+  const { assignedTuteeIds, assign, unassign, loading: loadingAssign } = useWorksheetAssignments(worksheetId);
+  const [pending, setPending] = useState<Set<string>>(new Set());
+
+  const toggle = async (tuteeId: string) => {
+    setPending((p) => new Set(p).add(tuteeId));
+    if (assignedTuteeIds.includes(tuteeId)) {
+      await unassign(tuteeId);
+    } else {
+      await assign([tuteeId]);
+    }
+    setPending((p) => { const s = new Set(p); s.delete(tuteeId); return s; });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+        <h2 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+          <UserCheck className="h-4 w-4 text-emerald-600" />
+          Assign to students
+        </h2>
+
+        {loadingTutees || loadingAssign ? (
+          <div className="flex justify-center py-6">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600" />
+          </div>
+        ) : tutees.length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-6">No students yet. Add some in the Students page.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+            {tutees.map((t) => {
+              const assigned = assignedTuteeIds.includes(t.id);
+              const busy = pending.has(t.id);
+              return (
+                <li key={t.id} className="flex items-center justify-between py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-7 w-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-semibold">
+                      {t.display_name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-sm text-slate-800">{t.display_name}</span>
+                  </div>
+                  <button
+                    onClick={() => toggle(t.id)}
+                    disabled={busy}
+                    className={cn(
+                      'text-xs px-3 py-1 rounded-md border font-medium transition-colors disabled:opacity-50',
+                      assigned
+                        ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                    )}
+                  >
+                    {busy ? '…' : assigned ? 'Assigned' : 'Assign'}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

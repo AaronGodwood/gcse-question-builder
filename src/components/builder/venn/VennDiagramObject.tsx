@@ -1,4 +1,4 @@
-import { Group, Circle, Text, Rect, Line } from 'react-konva';
+import { Group, Circle, Text, Rect } from 'react-konva';
 import type Konva from 'konva';
 import type { VennDiagramObject as VennDiagramObjectType } from '@/types/canvas';
 

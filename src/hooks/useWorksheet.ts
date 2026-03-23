@@ -99,7 +99,6 @@ export function useWorksheets() {
     const { data } = await supabase
       .from('worksheets')
       .select('*')
-      .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
     setWorksheets((data as Worksheet[]) ?? []);
     setLoading(false);

@@ -1,17 +1,13 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { PenSquare, Database, FileText, LogOut } from 'lucide-react';
+import { PenSquare, Database, FileText, Users, ShieldCheck, LogOut } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth, isSuperAdmin } from '@/hooks/useAuth';
 import { cn } from '@/lib/cn';
 
-const navItems = [
-  { to: '/builder', icon: PenSquare, label: 'Builder' },
-  { to: '/questions', icon: Database, label: 'Questions' },
-  { to: '/worksheets', icon: FileText, label: 'Worksheets' },
-];
-
 export default function AppLayout() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const superAdmin = isSuperAdmin(user);
+  const isTutor = superAdmin || profile?.role === 'tutor';
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -24,23 +20,11 @@ export default function AppLayout() {
         <div className="flex items-center gap-8">
           <span className="font-semibold text-white tracking-tight text-base">Markr</span>
           <nav className="flex items-center h-12">
-            {navItems.map(({ to, icon: Icon, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-2 px-3 h-12 text-sm font-medium transition-colors border-b-2',
-                    isActive
-                      ? 'text-white border-emerald-400'
-                      : 'text-slate-400 hover:text-slate-100 border-transparent'
-                  )
-                }
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </NavLink>
-            ))}
+            <NavItem to="/builder" icon={PenSquare} label="Builder" />
+            <NavItem to="/questions" icon={Database} label="Questions" />
+            <NavItem to="/worksheets" icon={FileText} label="Worksheets" />
+            {isTutor && <NavItem to="/students" icon={Users} label="Students" />}
+            {superAdmin && <NavItem to="/admin" icon={ShieldCheck} label="Admin" />}
           </nav>
         </div>
         <div className="flex items-center gap-3">
@@ -60,5 +44,24 @@ export default function AppLayout() {
         <Outlet />
       </main>
     </div>
+  );
+}
+
+function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        cn(
+          'flex items-center gap-2 px-3 h-12 text-sm font-medium transition-colors border-b-2',
+          isActive
+            ? 'text-white border-emerald-400'
+            : 'text-slate-400 hover:text-slate-100 border-transparent'
+        )
+      }
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </NavLink>
   );
 }

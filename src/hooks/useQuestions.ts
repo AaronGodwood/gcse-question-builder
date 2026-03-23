@@ -50,7 +50,6 @@ export function useQuestions(): UseQuestionsResult {
     let query = supabase
       .from('questions')
       .select('*')
-      .eq('user_id', user.id)
       .order(sort.field, { ascending: sort.dir === 'asc' });
 
     if (filters.topics.length > 0) {
