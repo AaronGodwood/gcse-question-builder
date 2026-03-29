@@ -286,23 +286,29 @@ async function renderCanvasToImage(
   const PAD = 24;  // padding around tight bounding box (px at 1x)
 
   // Compute tight bounding box across all objects
+  // Add extra margin on right/bottom for labels that render outside the object bounds
+  // (e.g. cylinder height label at w+22, 2D side labels via outwardNormal)
+  const LABEL_MARGIN = 50;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const obj of canvasData.objects) {
     const x1 = obj.x;
     const y1 = obj.y;
-    const x2 = obj.x + obj.width;
-    const y2 = obj.y + obj.height;
+    const hasLabels = obj.type === 'shape' && (obj as import('@/types/canvas').ShapeObject).dimensions?.sides?.some((s) => s.showLabel && s.label);
+    const extraR = hasLabels ? LABEL_MARGIN : 0;
+    const extraB = hasLabels ? LABEL_MARGIN : 0;
+    const x2 = obj.x + obj.width + extraR;
+    const y2 = obj.y + obj.height + extraB;
     if (x1 < minX) minX = x1;
     if (y1 < minY) minY = y1;
     if (x2 > maxX) maxX = x2;
     if (y2 > maxY) maxY = y2;
   }
 
-  // Add padding and clamp to canvas bounds
+  // Add padding; only clamp left/top to canvas bounds, allow right/bottom to extend for labels
   minX = Math.max(0, minX - PAD);
   minY = Math.max(0, minY - PAD);
-  maxX = Math.min(canvasData.width, maxX + PAD);
-  maxY = Math.min(canvasData.height, maxY + PAD);
+  maxX = maxX + PAD;
+  maxY = maxY + PAD;
 
   const cropW = maxX - minX;
   const cropH = maxY - minY;
@@ -419,7 +425,7 @@ async function renderShapeToGroup(shape: import('@/types/canvas').ShapeObject, g
   };
 
   const labelNode = (x: number, y: number, text: string) =>
-    group.add(new Konva.Text({ x: x - 20, y: y - 8, text, fontSize: 11, fontFamily: 'Arial', fill: col, align: 'center', width: 40 }));
+    group.add(new Konva.Text({ x: x - 30, y: y - 8, text, fontSize: 11, fontFamily: 'Arial', fill: col, align: 'center', width: 60 }));
 
   if (shapeType === 'circle') {
     const r = dimensions.radius ?? w / 2;
@@ -530,9 +536,78 @@ async function renderShapeToGroup(shape: import('@/types/canvas').ShapeObject, g
 
   } else {
     // 2D polygon shapes — reuse shapeGeometry
-    const { getShapePoints, flattenPoints } = await import('@/lib/shapeGeometry');
+    const { getShapePoints, flattenPoints, centroid, outwardNormal, rightAngleMarkerPoints, tickMarkPoints } = await import('@/lib/shapeGeometry');
     const pts = getShapePoints(shapeType, w, h);
     group.add(new Konva.Line({ points: flattenPoints(pts), closed: true, ...strokeProps }));
+
+    const c = centroid(pts);
+
+    // Side labels
+    dimensions.sides.forEach((side, i) => {
+      if (!side.showLabel || !side.label) return;
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      if (!a || !b) return;
+      const pos = outwardNormal(a, b, c, 18);
+      group.add(new Konva.Text({ x: pos.x - 20, y: pos.y - 8, text: side.label, fontSize: 11, fontFamily: 'Arial', fill: col, align: 'center', width: 40 }));
+    });
+
+    // Angle arcs + labels
+    dimensions.angles.forEach((angle, i) => {
+      if (!angle.showArc && !angle.showLabel) return;
+      const vertex = pts[i];
+      if (!vertex) return;
+      const prev = pts[(i - 1 + pts.length) % pts.length];
+      const next = pts[(i + 1) % pts.length];
+      if (!prev || !next) return;
+      const toPrev = { x: prev.x - vertex.x, y: prev.y - vertex.y };
+      const toNext = { x: next.x - vertex.x, y: next.y - vertex.y };
+      const lenPrev = Math.sqrt(toPrev.x ** 2 + toPrev.y ** 2) || 1;
+      const lenNext = Math.sqrt(toNext.x ** 2 + toNext.y ** 2) || 1;
+      const anglePrev = (Math.atan2(toPrev.y, toPrev.x) * 180) / Math.PI;
+      const angleNext = (Math.atan2(toNext.y, toNext.x) * 180) / Math.PI;
+      let sweep = angleNext - anglePrev;
+      if (sweep < 0) sweep += 360;
+      if (sweep > 180) sweep -= 360;
+      const arcR = Math.min(lenPrev, lenNext, 20) * 0.4 + 8;
+      if (angle.showArc) {
+        group.add(new Konva.Arc({ x: vertex.x, y: vertex.y, innerRadius: arcR, outerRadius: arcR, angle: Math.abs(sweep), rotation: sweep >= 0 ? anglePrev : anglePrev + sweep, stroke: col, strokeWidth: sw }));
+      }
+      if (angle.showLabel && angle.label) {
+        const bisectorAngle = anglePrev + sweep / 2;
+        const bisRad = (bisectorAngle * Math.PI) / 180;
+        const labelDist = arcR + 10;
+        group.add(new Konva.Text({ x: vertex.x + Math.cos(bisRad) * labelDist - 14, y: vertex.y + Math.sin(bisRad) * labelDist - 7, text: angle.label, fontSize: 10, fontFamily: 'Arial', fill: col, align: 'center', width: 28 }));
+      }
+    });
+
+    // Right angle markers
+    shape.annotations.rightAngleMarkers.forEach((vertexIdx) => {
+      const vertex = pts[vertexIdx];
+      const prev = pts[(vertexIdx - 1 + pts.length) % pts.length];
+      const next = pts[(vertexIdx + 1) % pts.length];
+      if (!vertex || !prev || !next) return;
+      const markerPts = rightAngleMarkerPoints(vertex, prev, next, 10);
+      group.add(new Konva.Line({ points: markerPts, stroke: col, strokeWidth: 1.5 }));
+    });
+
+    // Equal side tick marks
+    Object.entries(shape.annotations.equalSideMarkers).forEach(([sideId, tickCount]) => {
+      const idx = dimensions.sides.findIndex((s) => s.id === sideId);
+      if (idx < 0) return;
+      const a = pts[idx];
+      const b = pts[(idx + 1) % pts.length];
+      if (!a || !b) return;
+      const ticks = tickMarkPoints(a, b, tickCount as number);
+      for (const tp of ticks) {
+        group.add(new Konva.Line({ points: tp, stroke: col, strokeWidth: 1.5 }));
+      }
+    });
+
+    // Not to scale
+    if (shape.notToScale) {
+      group.add(new Konva.Text({ x: 0, y: h + 6, text: 'Diagram NOT accurately drawn', fontSize: 9, fontFamily: 'Arial', fontStyle: 'italic', fill: '#555', width: w, align: 'center' }));
+    }
   }
 }
 
