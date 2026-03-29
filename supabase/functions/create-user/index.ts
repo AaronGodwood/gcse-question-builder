@@ -11,35 +11,26 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('create-user invoked', req.method);
     const SUPER_ADMIN_EMAIL = Deno.env.get('SUPER_ADMIN_EMAIL') ?? 'godwoodaaron@gmail.com';
 
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
     if (!authHeader) {
       return json({ error: 'Missing Authorization header' }, 401);
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    console.log('env check', { hasUrl: !!supabaseUrl, hasAnon: !!supabaseAnonKey, hasService: !!supabaseServiceKey });
 
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+    if (!supabaseUrl || !supabaseServiceKey) {
       return json({ error: 'Missing environment variables' }, 500);
     }
-
-    // Supabase client using the caller's JWT (for identity verification)
-    const supabaseClient = createClient(
-      supabaseUrl,
-      supabaseAnonKey,
-      { global: { headers: { Authorization: authHeader } } }
-    );
 
     // Supabase admin client (service role, never exposed to frontend)
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify caller identity
-    const { data: { user: caller }, error: callerErr } = await supabaseClient.auth.getUser();
+    // Verify caller identity — pass token directly to avoid "Auth session missing"
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user: caller }, error: callerErr } = await supabaseAdmin.auth.getUser(token);
     if (callerErr || !caller) {
       return json({ error: 'Unauthorized' }, 401);
     }
