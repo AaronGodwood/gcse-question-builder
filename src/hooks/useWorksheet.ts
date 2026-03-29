@@ -99,6 +99,7 @@ export function useWorksheets() {
     const { data } = await supabase
       .from('worksheets')
       .select('*')
+      .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
     setWorksheets((data as Worksheet[]) ?? []);
     setLoading(false);
@@ -110,4 +111,28 @@ export function useWorksheets() {
   }, []);
 
   return { worksheets, loading, refresh, deleteWorksheet };
+}
+
+// Fetches the current tutee's tutor's non-private worksheets for the Explore section
+export function useTutorWorksheets() {
+  const { user } = useAuth();
+  const [worksheets, setWorksheets] = useState<Worksheet[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const refresh = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    // RLS already filters to tutor's non-private worksheets the tutee can see;
+    // exclude the tutee's own worksheets
+    const { data } = await supabase
+      .from('worksheets')
+      .select('*')
+      .neq('user_id', user.id)
+      .eq('is_private', false)
+      .order('updated_at', { ascending: false });
+    setWorksheets((data as Worksheet[]) ?? []);
+    setLoading(false);
+  }, [user]);
+
+  return { worksheets, loading, refresh };
 }

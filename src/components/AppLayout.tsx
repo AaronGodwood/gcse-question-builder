@@ -8,6 +8,7 @@ export default function AppLayout() {
   const { user, profile } = useAuth();
   const superAdmin = isSuperAdmin(user);
   const isTutor = superAdmin || profile?.role === 'tutor';
+  const isTutee = profile?.role === 'tutee';
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -20,7 +21,7 @@ export default function AppLayout() {
         <div className="flex items-center gap-8">
           <span className="font-semibold text-white tracking-tight text-base">Markr</span>
           <nav className="flex items-center h-12">
-            <NavItem to="/builder" icon={PenSquare} label="Builder" />
+            {!isTutee && <NavItem to="/builder" icon={PenSquare} label="Builder" />}
             <NavItem to="/questions" icon={Database} label="Questions" />
             <NavItem to="/worksheets" icon={FileText} label="Worksheets" />
             {isTutor && <NavItem to="/students" icon={Users} label="Students" />}

@@ -3,6 +3,13 @@ import { Suspense, lazy } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import AuthPage from '@/pages/AuthPage';
+import { useAuth } from '@/hooks/useAuth';
+
+function DefaultRedirect() {
+  const { profile, loading } = useAuth();
+  if (loading) return null;
+  return <Navigate to={profile?.role === 'tutee' ? '/worksheets' : '/builder'} replace />;
+}
 
 const BuilderPage = lazy(() => import('@/pages/BuilderPage'));
 const QuestionsPage = lazy(() => import('@/pages/QuestionsPage'));
@@ -31,7 +38,7 @@ export default function App() {
             </AuthGuard>
           }
         >
-          <Route index element={<Navigate to="/builder" replace />} />
+          <Route index element={<DefaultRedirect />} />
           <Route
             path="builder"
             element={

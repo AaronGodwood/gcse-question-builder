@@ -44,8 +44,15 @@ Deno.serve(async (req) => {
         .from('profiles')
         .select('role')
         .eq('id', caller.id)
-        .single();
+        .maybeSingle();
       callerRole = profile?.role ?? null;
+
+      if (!callerRole) {
+        await supabaseAdmin
+          .from('profiles')
+          .upsert({ id: caller.id, role: 'tutor', display_name: caller.email ?? '' }, { onConflict: 'id' });
+        callerRole = 'tutor';
+      }
     }
 
     if (!callerIsSuperAdmin && callerRole !== 'tutor') {
@@ -63,12 +70,9 @@ Deno.serve(async (req) => {
       return json({ error: 'Missing required fields: email, password, displayName, targetRole' }, 400);
     }
 
-    // Validate role permissions
+    // Tutors can only create tutees; super admin can create either
     if (!callerIsSuperAdmin && targetRole !== 'tutee') {
       return json({ error: 'Tutors can only create tutee accounts' }, 403);
-    }
-    if (callerIsSuperAdmin && targetRole === 'tutee') {
-      return json({ error: 'Super admin can only create tutor accounts' }, 403);
     }
 
     // Create the auth user
@@ -101,7 +105,12 @@ Deno.serve(async (req) => {
     }
 
     // Link tutor → tutee
-    if (targetRole === 'tutee' && !callerIsSuperAdmin) {
+    if (targetRole === 'tutee') {
+      // Ensure caller has a profile row (super admin and pre-migration tutors may not have one)
+      await supabaseAdmin
+        .from('profiles')
+        .upsert({ id: caller.id, role: 'tutor', display_name: caller.email ?? '' }, { onConflict: 'id' });
+
       const { error: linkErr } = await supabaseAdmin
         .from('tutor_tutee')
         .insert({ tutor_id: caller.id, tutee_id: newId });
