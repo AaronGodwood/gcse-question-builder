@@ -4,11 +4,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTuteeAssignments } from '@/hooks/useWorksheetCollections';
 import { useWorksheetCollections } from '@/hooks/useWorksheetCollections';
 import { useWorksheets, useTutorWorksheets } from '@/hooks/useWorksheet';
-import { generatePdf } from '@/lib/pdfExport';
+import { generateWorksheetPDF, type ExportItem } from '@/lib/pdfExport';
 import { supabase } from '@/lib/supabase';
 import type { Worksheet } from '@/types/worksheet';
 import type { Question } from '@/types/question';
-import { cn } from '@/lib/cn';
+import type { WorksheetQuestionSettings } from '@/types/worksheet';
 
 function Section({
   title, count, defaultOpen = true, children,
@@ -56,7 +56,17 @@ function WorksheetRow({
   const handleDownload = async () => {
     setExporting(true);
     const questions = await fetchQuestionsForWorksheet(worksheet);
-    await generatePdf({ worksheet, questions });
+    const questionMap = Object.fromEntries(questions.map((q) => [q.id, q]));
+    const savedSettings: WorksheetQuestionSettings[] = worksheet.settings.question_settings ?? [];
+    const items: ExportItem[] = worksheet.question_ids.flatMap((id) => {
+      const q = questionMap[id];
+      if (!q) return [];
+      const s = savedSettings.find((qs) => qs.question_id === id) ?? {
+        question_id: id, include_answer_space: true, answer_lines: 4, question_number: null,
+      };
+      return [{ question: q, settings: s }];
+    });
+    await generateWorksheetPDF(items, worksheet.settings);
     setExporting(false);
   };
 
