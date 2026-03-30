@@ -70,7 +70,7 @@ function defaultSides(shapeType: ShapeType) {
 
   switch (shapeType) {
     case 'triangle-right':
-      return [s('a', 6), s('b', 8), s('c', 10)];
+      return [s('a', 6), s('c', 10), s('b', 8)];
     case 'triangle-isosceles':
       return [s('a', 7), s('b', 7), s('c', 10)];
     case 'triangle-equilateral':

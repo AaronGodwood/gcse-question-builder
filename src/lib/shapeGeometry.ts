@@ -32,7 +32,7 @@ export function getShapePoints(
       ];
 
     case 'triangle-right':
-      // Right angle at bottom-left
+      // Right angle at bottom-left: side 0=base, side 1=hypotenuse, side 2=height
       return [
         { x: 0, y: h }, { x: w, y: h }, { x: 0, y: 0 },
       ];

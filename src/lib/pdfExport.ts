@@ -291,15 +291,14 @@ async function renderCanvasToImage(
   const LABEL_MARGIN = 50;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const obj of canvasData.objects) {
-    const x1 = obj.x;
-    const y1 = obj.y;
     const hasLabels = obj.type === 'shape' && (obj as import('@/types/canvas').ShapeObject).dimensions?.sides?.some((s) => s.showLabel && s.label);
-    const extraR = hasLabels ? LABEL_MARGIN : 0;
-    const extraB = hasLabels ? LABEL_MARGIN : 0;
-    const x2 = obj.x + obj.width + extraR;
-    const y2 = obj.y + obj.height + extraB;
-    if (x1 < minX) minX = x1;
-    if (y1 < minY) minY = y1;
+    const extra = hasLabels ? LABEL_MARGIN : 0;
+    const x1WithMargin = obj.x - extra;
+    const y1WithMargin = obj.y - extra;
+    const x2 = obj.x + obj.width + extra;
+    const y2 = obj.y + obj.height + extra;
+    if (x1WithMargin < minX) minX = x1WithMargin;
+    if (y1WithMargin < minY) minY = y1WithMargin;
     if (x2 > maxX) maxX = x2;
     if (y2 > maxY) maxY = y2;
   }

@@ -52,7 +52,7 @@ export function WorksheetBuilder() {
 function BuilderTab() {
   const navigate = useNavigate();
   const store = useWorksheetStore();
-  const { save, saving } = useWorksheet();
+  const { save, saving, newWorksheet } = useWorksheet();
   const { user, profile } = useAuth();
   const superAdmin = isSuperAdmin(user);
   const isTutor = superAdmin || profile?.role === 'tutor';
@@ -152,6 +152,13 @@ function BuilderTab() {
             >
               <Settings className="h-3.5 w-3.5" />
               Settings
+            </button>
+            <button
+              onClick={() => newWorksheet()}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New
             </button>
             <button
               onClick={() => save()}
