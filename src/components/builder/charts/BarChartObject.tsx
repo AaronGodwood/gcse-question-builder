@@ -1,4 +1,4 @@
-import { Group, Rect, Line, Text, Arrow } from 'react-konva';
+import { Group, Rect, Line, Arrow } from 'react-konva';
 import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { BarChartObject as BarChartObjectType } from '@/types/canvas';

@@ -1,4 +1,4 @@
-import { Group, Line, Circle as KonvaCircle, Arc, Text } from 'react-konva';
+import { Group, Line, Circle as KonvaCircle, Arc } from 'react-konva';
 import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { CircleDiagramObject as CircleDiagramObjectType, CircleDiagramPoint } from '@/types/canvas';

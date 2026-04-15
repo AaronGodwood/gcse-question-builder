@@ -1,4 +1,4 @@
-import { Group, Rect, Text, Arc, Line } from 'react-konva';
+import { Group, Rect, Arc, Line } from 'react-konva';
 import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { PieChartObject as PieChartObjectType } from '@/types/canvas';

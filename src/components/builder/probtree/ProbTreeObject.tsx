@@ -1,4 +1,4 @@
-import { Group, Rect, Line, Text, Circle } from 'react-konva';
+import { Group, Rect, Line, Circle } from 'react-konva';
 import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { ProbTreeObject as ProbTreeObjectType, ProbTreeNode } from '@/types/canvas';

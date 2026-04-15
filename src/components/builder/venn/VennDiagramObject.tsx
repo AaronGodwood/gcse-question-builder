@@ -1,4 +1,4 @@
-import { Group, Circle, Text, Rect } from 'react-konva';
+import { Group, Circle, Rect } from 'react-konva';
 import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { VennDiagramObject as VennDiagramObjectType } from '@/types/canvas';

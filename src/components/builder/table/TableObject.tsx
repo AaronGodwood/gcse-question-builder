@@ -1,4 +1,4 @@
-import { Group, Rect, Line, Text } from 'react-konva';
+import { Group, Rect, Line } from 'react-konva';
 import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { TableObject as TableObjectType } from '@/types/canvas';

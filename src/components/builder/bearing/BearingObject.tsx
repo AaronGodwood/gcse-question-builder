@@ -1,4 +1,4 @@
-import { Group, Rect, Line, Text, Arc, Arrow } from 'react-konva';
+import { Group, Rect, Line, Arc, Arrow } from 'react-konva';
 import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { BearingObject as BearingObjectType } from '@/types/canvas';

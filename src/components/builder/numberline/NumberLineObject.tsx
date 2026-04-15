@@ -1,4 +1,4 @@
-import { Group, Line, Circle, Text, Arrow, Rect } from 'react-konva';
+import { Group, Line, Circle, Arrow, Rect } from 'react-konva';
 import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { NumberLineObject as NumberLineObjectType } from '@/types/canvas';
