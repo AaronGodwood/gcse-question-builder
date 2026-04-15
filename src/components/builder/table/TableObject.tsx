@@ -1,4 +1,5 @@
 import { Group, Rect, Line, Text } from 'react-konva';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { TableObject as TableObjectType } from '@/types/canvas';
 
@@ -56,7 +57,7 @@ export function TableObject({ table, isSelected, onSelect, onChange }: Props) {
                 fill={shaded ? '#d0d0d0' : '#ffffff'}
                 listening={false}
               />
-              <Text
+              <LatexLabel
                 x={x + 4} y={y}
                 width={cw - 8} height={rowHeight}
                 text={cell?.content ?? ''}

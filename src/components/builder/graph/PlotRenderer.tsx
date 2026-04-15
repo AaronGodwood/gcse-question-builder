@@ -1,4 +1,5 @@
 import { Line, Text } from 'react-konva';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 import type { GraphObject, PlotSettings } from '@/types/canvas';
 import {
   parseEquation,
@@ -184,7 +185,7 @@ function SinglePlot({
           {...strokeProps}
         />
         {plot.showLabel && (
-          <Text
+          <LatexLabel
             x={px + 4} y={8}
             text={label}
             fontSize={10}
@@ -321,7 +322,7 @@ function SinglePlot({
         })}
 
         {plot.showLabel && labelPos && (
-          <Text
+          <LatexLabel
             x={labelPos.px + 4}
             y={labelPos.py - 18}
             text={toSuperscript(plot.label || plot.equation)}

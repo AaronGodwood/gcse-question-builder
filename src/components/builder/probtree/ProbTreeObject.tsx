@@ -1,4 +1,5 @@
 import { Group, Rect, Line, Text, Circle } from 'react-konva';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { ProbTreeObject as ProbTreeObjectType, ProbTreeNode } from '@/types/canvas';
 
@@ -110,7 +111,7 @@ export function ProbTreeObject({ obj, isSelected, onSelect, onChange }: Props) {
     // Probability label — offset perpendicular to the branch, away from the line
     if (node.probability) {
       edges.push(
-        <Text
+        <LatexLabel
           key={`p-${node.id}`}
           x={mx + sign * perpX * LABEL_OFFSET - 24}
           y={my + sign * perpY * LABEL_OFFSET - style.fontSize / 2}
@@ -128,7 +129,7 @@ export function ProbTreeObject({ obj, isSelected, onSelect, onChange }: Props) {
     // Outcome label — above the endpoint, clear of the dot and incoming branches
     if (node.label) {
       nodeEls.push(
-        <Text
+        <LatexLabel
           key={`lbl-${node.id}`}
           x={to.x - 20}
           y={to.y - style.fontSize - NODE_R - 3}
@@ -151,7 +152,7 @@ export function ProbTreeObject({ obj, isSelected, onSelect, onChange }: Props) {
 
       if (showOutcomes && node.outcome) {
         nodeEls.push(
-          <Text
+          <LatexLabel
             key={`out-${node.id}`}
             x={outcomeX}
             y={to.y - style.fontSize / 2}
@@ -175,7 +176,7 @@ export function ProbTreeObject({ obj, isSelected, onSelect, onChange }: Props) {
         }
         if (probs.length > 0) {
           nodeEls.push(
-            <Text
+            <LatexLabel
               key={`prod-${node.id}`}
               x={outcomeX}
               y={to.y + style.fontSize / 2 + 1}

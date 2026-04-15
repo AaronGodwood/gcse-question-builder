@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { renderCanvasToImage } from '@/lib/pdfExport';
 import { useNavigate } from 'react-router-dom';
 import {
   Pencil, Copy, Trash2, Download, BookPlus,
   Calculator, FileText,
 } from 'lucide-react';
 import { cn, toSuperscript } from '@/lib/cn';
+import { hasLatex, renderInlineToHtml } from '@/lib/latex';
 import type { Question } from '@/types/question';
 import { useWorksheetStore } from '@/stores/worksheetStore';
 
@@ -94,9 +96,16 @@ export function QuestionCard({ question: q, selected, onSelect, onDelete, onDupl
 
         {/* Question text preview */}
         {q.question_text && (
-          <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">
-            {toSuperscript(q.question_text)}
-          </p>
+          hasLatex(q.question_text) ? (
+            <p
+              className="text-xs text-slate-500 mt-0.5 line-clamp-2 leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: renderInlineToHtml(q.question_text) }}
+            />
+          ) : (
+            <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">
+              {toSuperscript(q.question_text)}
+            </p>
+          )
         )}
 
         {/* Meta chips */}
@@ -189,23 +198,42 @@ function ActionBtn({
   );
 }
 
-/** Very lightweight static thumbnail — just counts object types */
-function CanvasThumbnail({ question: q }: { question: Question }) {
-  const objects = q.canvas_data?.objects ?? [];
-  const shapes = objects.filter((o) => o.type === 'shape').length;
-  const graphs = objects.filter((o) => o.type === 'graph').length;
-  const texts = objects.filter((o) => o.type === 'text').length;
-  const marks = objects.filter((o) => o.type === 'mark-box').length;
+const thumbCache = new Map<string, string>();
 
+function CanvasThumbnail({ question: q }: { question: Question }) {
+  const cacheKey = `${q.id}:${q.updated_at ?? ''}`;
+  const [url, setUrl] = useState<string | null>(() => thumbCache.get(cacheKey) ?? null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (url || failed) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!q.canvas_data) { setFailed(true); return; }
+        const result = await renderCanvasToImage(q.canvas_data);
+        if (cancelled) return;
+        if (result) {
+          thumbCache.set(cacheKey, result.dataUrl);
+          setUrl(result.dataUrl);
+        } else {
+          setFailed(true);
+        }
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [cacheKey, q.canvas_data, url, failed]);
+
+  if (url) {
+    return <img src={url} alt="" className="max-h-full max-w-full object-contain" />;
+  }
+
+  const objects = q.canvas_data?.objects ?? [];
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="flex gap-2 text-slate-400">
-        {shapes > 0 && <span className="text-xs">{shapes} shape{shapes !== 1 ? 's' : ''}</span>}
-        {graphs > 0 && <span className="text-xs">{graphs} graph{graphs !== 1 ? 's' : ''}</span>}
-        {texts > 0 && <span className="text-xs">{texts} text{texts !== 1 ? 's' : ''}</span>}
-        {marks > 0 && <span className="text-xs">{marks} mark box{marks !== 1 ? 'es' : ''}</span>}
-      </div>
-      <span className="text-[10px] text-slate-300">{objects.length} object{objects.length !== 1 ? 's' : ''} total</span>
-    </div>
+    <span className="text-[10px] text-slate-300">
+      {failed ? 'Preview unavailable' : `Rendering ${objects.length} object${objects.length !== 1 ? 's' : ''}…`}
+    </span>
   );
 }

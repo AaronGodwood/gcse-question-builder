@@ -14,6 +14,7 @@ const SUPERSCRIPTS: Record<string, string> = {
 };
 
 export function toSuperscript(text: string): string {
+  if (text.includes('$')) return text; // leave LaTeX untouched
   return text.replace(/\^\(?(-?[\d]+)\)?/g, (_, exp: string) =>
     exp.split('').map((c) => SUPERSCRIPTS[c] ?? c).join('')
   );

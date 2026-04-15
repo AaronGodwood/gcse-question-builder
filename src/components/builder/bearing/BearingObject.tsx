@@ -1,4 +1,5 @@
 import { Group, Rect, Line, Text, Arc, Arrow } from 'react-konva';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { BearingObject as BearingObjectType } from '@/types/canvas';
 
@@ -68,7 +69,7 @@ export function BearingObject({ obj, isSelected, onSelect, onChange }: Props) {
 
       {/* North label */}
       {showNorthLine && (
-        <Text
+        <LatexLabel
           x={cx - 12}
           y={cy - northLen - style.fontSize - 4}
           width={24}
@@ -110,7 +111,7 @@ export function BearingObject({ obj, isSelected, onSelect, onChange }: Props) {
 
       {/* Bearing label at mid-arc */}
       {showLabel && bearing > 0 && (
-        <Text
+        <LatexLabel
           x={labelX - 20}
           y={labelY - style.fontSize / 2}
           width={40}

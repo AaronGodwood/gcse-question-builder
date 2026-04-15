@@ -1,4 +1,5 @@
 import { Group, Line, Circle, Text, Arrow, Rect } from 'react-konva';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { NumberLineObject as NumberLineObjectType } from '@/types/canvas';
 
@@ -112,7 +113,7 @@ export function NumberLineObject({ obj, isSelected, onSelect, onChange }: Props)
         const tx = toX(v);
         const label = Number.isInteger(v) ? String(v) : v.toFixed(1);
         return (
-          <Text
+          <LatexLabel
             key={`n-${v}`}
             x={tx - 16}
             y={lineY + tickH + 3}
@@ -142,7 +143,7 @@ export function NumberLineObject({ obj, isSelected, onSelect, onChange }: Props)
               listening={false}
             />
             {m.showLabel && m.label && (
-              <Text
+              <LatexLabel
                 x={mx - 20}
                 y={lineY - 24}
                 width={40}

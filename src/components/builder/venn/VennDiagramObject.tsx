@@ -1,4 +1,5 @@
 import { Group, Circle, Text, Rect } from 'react-konva';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { VennDiagramObject as VennDiagramObjectType } from '@/types/canvas';
 
@@ -63,7 +64,7 @@ export function VennDiagramObject({ obj, isSelected, onSelect, onChange }: Props
 
       {/* Universal set label (ξ) */}
       {universalSet.show && (
-        <Text
+        <LatexLabel
           x={6}
           y={6}
           text={universalSet.label}
@@ -118,7 +119,7 @@ export function VennDiagramObject({ obj, isSelected, onSelect, onChange }: Props
       />
 
       {/* Circle A label */}
-      <Text
+      <LatexLabel
         x={circleA.x - circleA.r}
         y={circleA.y - circleA.r - fontSize - 4}
         width={circleA.r * 2}
@@ -132,7 +133,7 @@ export function VennDiagramObject({ obj, isSelected, onSelect, onChange }: Props
       />
 
       {/* Circle B label */}
-      <Text
+      <LatexLabel
         x={circleB.x - circleB.r}
         y={circleB.y - circleB.r - fontSize - 4}
         width={circleB.r * 2}
@@ -147,7 +148,7 @@ export function VennDiagramObject({ obj, isSelected, onSelect, onChange }: Props
 
       {/* Region labels */}
       {regionLabels.aOnly.show && regionLabels.aOnly.text && (
-        <Text
+        <LatexLabel
           x={aOnlyX - 24}
           y={aOnlyY - fontSize / 2}
           width={48}
@@ -160,7 +161,7 @@ export function VennDiagramObject({ obj, isSelected, onSelect, onChange }: Props
         />
       )}
       {regionLabels.intersection.show && regionLabels.intersection.text && (
-        <Text
+        <LatexLabel
           x={interX - 24}
           y={interY - fontSize / 2}
           width={48}
@@ -173,7 +174,7 @@ export function VennDiagramObject({ obj, isSelected, onSelect, onChange }: Props
         />
       )}
       {regionLabels.bOnly.show && regionLabels.bOnly.text && (
-        <Text
+        <LatexLabel
           x={bOnlyX - 24}
           y={bOnlyY - fontSize / 2}
           width={48}
@@ -186,7 +187,7 @@ export function VennDiagramObject({ obj, isSelected, onSelect, onChange }: Props
         />
       )}
       {regionLabels.outside.show && regionLabels.outside.text && (
-        <Text
+        <LatexLabel
           x={outsideX}
           y={outsideY + fontSize + 4}
           text={regionLabels.outside.text}

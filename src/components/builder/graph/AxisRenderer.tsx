@@ -1,5 +1,6 @@
 import { Line, Text } from 'react-konva';
 import type { GraphObject } from '@/types/canvas';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 
 interface Props {
   graph: GraphObject;
@@ -66,7 +67,7 @@ export function AxisRenderer({ graph, toPixel, width, height }: Props) {
   // Axis labels
   if (s.showAxisLabels) {
     elements.push(
-      <Text
+      <LatexLabel
         key="x-label"
         x={width - 6}
         y={axisY + 6}
@@ -77,7 +78,7 @@ export function AxisRenderer({ graph, toPixel, width, height }: Props) {
         fill={s.axisColor}
         listening={false}
       />,
-      <Text
+      <LatexLabel
         key="y-label"
         x={axisX + 6}
         y={4}
