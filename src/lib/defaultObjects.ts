@@ -99,7 +99,7 @@ function defaultSides(shapeType: ShapeType) {
     case 'cuboid':
       return [s('l', 8, 'l = 8 cm'), s('w', 5, 'w = 5 cm'), s('h', 6, 'h = 6 cm')];
     case 'cone':
-      return [s('r', 4, 'r = 4 cm'), s('h', 9, 'h = 9 cm'), s('l', 10, 'l = 10 cm')];
+      return [s('r', 4, 'r = 4 cm'), s('l', 10, 'l = 10 cm'), s('h', 9, 'h = 9 cm')];
     case 'frustum':
       return [s('r1', 3, 'r\u2081 = 3 cm'), s('r2', 6, 'r\u2082 = 6 cm'), s('h', 8, 'h = 8 cm')];
     case 'cylinder':

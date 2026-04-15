@@ -1,4 +1,5 @@
 import { Circle, Text } from 'react-konva';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 import type { GraphObject } from '@/types/canvas';
 import { parseEquation, findIntersections } from '@/lib/equations';
 
@@ -27,7 +28,7 @@ export function PointsRenderer({ graph, toPixel }: Props) {
     );
     if (pt.showLabel && pt.label) {
       elements.push(
-        <Text
+        <LatexLabel
           key={`ptl-${i}`}
           x={px + 6}
           y={py - 10}

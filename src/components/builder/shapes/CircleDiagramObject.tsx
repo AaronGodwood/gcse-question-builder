@@ -1,4 +1,5 @@
-import { Group, Line, Circle as KonvaCircle, Arc, Text } from 'react-konva';
+import { Group, Line, Circle as KonvaCircle, Arc } from 'react-konva';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { CircleDiagramObject as CircleDiagramObjectType, CircleDiagramPoint } from '@/types/canvas';
 import { tickMarkPoints } from '@/lib/shapeGeometry';
@@ -150,7 +151,7 @@ export function CircleDiagramObject({ diagram, isSelected, onSelect, onChange }:
               />
             )}
             {ang.showLabel && ang.label && (
-              <Text
+              <LatexLabel
                 x={vertex.px + Math.cos(bisRad) * labelDist - 14}
                 y={vertex.py + Math.sin(bisRad) * labelDist - 7}
                 text={ang.label}
@@ -171,7 +172,7 @@ export function CircleDiagramObject({ diagram, isSelected, onSelect, onChange }:
         const { px, py } = pixelMap[pt.id];
         const { dx, dy } = labelOffset(px, py, cx, cy, pt.position);
         return (
-          <Text
+          <LatexLabel
             key={`lbl-${pt.id}`}
             x={px + dx - 7}
             y={py + dy - 7}
@@ -201,7 +202,7 @@ export function CircleDiagramObject({ diagram, isSelected, onSelect, onChange }:
 
       {/* 7. Not to scale */}
       {diagram.notToScale && (
-        <Text
+        <LatexLabel
           x={0} y={diagram.height + 4}
           text="Diagram NOT accurately drawn"
           fontSize={9}

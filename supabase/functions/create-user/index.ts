@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
 
     const newId = newUser.user.id;
 
-    // Insert profile row
+    // Insert profile row — must_change_password so user is prompted to set their own password on first login
     const { error: profileErr } = await supabaseAdmin
       .from('profiles')
       .insert({
@@ -96,6 +96,7 @@ Deno.serve(async (req) => {
         role: targetRole,
         display_name: displayName,
         created_by: callerIsSuperAdmin ? null : caller.id,
+        must_change_password: true,
       });
 
     if (profileErr) {

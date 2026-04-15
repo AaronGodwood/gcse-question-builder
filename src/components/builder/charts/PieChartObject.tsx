@@ -1,4 +1,5 @@
-import { Group, Rect, Text, Arc, Line } from 'react-konva';
+import { Group, Rect, Arc, Line } from 'react-konva';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { PieChartObject as PieChartObjectType } from '@/types/canvas';
 
@@ -50,7 +51,7 @@ export function PieChartObject({ obj, isSelected, onSelect, onChange }: Props) {
     >
       {/* Title */}
       {showTitle && (
-        <Text
+        <LatexLabel
           x={0}
           y={4}
           width={W}
@@ -108,7 +109,7 @@ export function PieChartObject({ obj, isSelected, onSelect, onChange }: Props) {
               strokeWidth={0.8}
               listening={false}
             />
-            <Text
+            <LatexLabel
               x={lx - 24}
               y={ly - style.fontSize / 2}
               width={48}

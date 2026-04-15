@@ -3,6 +3,7 @@ import type Konva from 'konva';
 import type { ShapeObject as ShapeObjectType } from '@/types/canvas';
 import { getShapePoints, flattenPoints } from '@/lib/shapeGeometry';
 import { ShapeLabels } from './ShapeLabels';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 
 interface Props {
   shape: ShapeObjectType;
@@ -143,7 +144,7 @@ function ThreeDShape({ shape }: { shape: ShapeObjectType }) {
   );
 
   const label = (x: number, y: number, text: string) => (
-    <Text x={x - 20} y={y - 8} text={text} fontSize={11} fontFamily="Arial" fill={col} align="center" width={40} listening={false} />
+    <LatexLabel x={x - 20} y={y - 8} text={text} fontSize={11} fontFamily="Arial" fill={col} align="center" width={40} listening={false} />
   );
 
   const side = (i: number) => dimensions.sides[i];
@@ -215,10 +216,12 @@ function ThreeDShape({ shape }: { shape: ShapeObjectType }) {
           clipFunc={(ctx: CanvasRenderingContext2D) => { ctx.rect(-eRx - 2, -(eRy + 2), (eRx + 2) * 2, eRy + 2); }}
           listening={false}
         />
-        {/* Labels: r (below base centre), l (left of left slant), h (right of right slant) */}
+        {/* Dashed interior apex→base-centre line for h — toggled by side[2].showLabel */}
+        {side(2)?.showLabel && edge([cx, 0, cx, baseY], true)}
+        {/* Labels: r (below base centre), l (left of left slant), h (right of interior dashed line) */}
         {lbl(0) && label(cx, baseY + eRy + 14, lbl(0))}
         {lbl(1) && label(cx * 0.25, baseY * 0.45, lbl(1))}
-        {lbl(2) && label(w + 22, baseY / 2 - 4, lbl(2))}
+        {lbl(2) && label(cx + 14, baseY / 2 - 4, lbl(2))}
         {shape.notToScale && (
           <Text x={0} y={h + 16} text="Diagram NOT accurately drawn" fontSize={9} fontFamily="Arial" fontStyle="italic" fill="#555" width={w} align="center" />
         )}

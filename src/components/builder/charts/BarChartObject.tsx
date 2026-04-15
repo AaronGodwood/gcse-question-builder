@@ -1,4 +1,5 @@
-import { Group, Rect, Line, Text, Arrow } from 'react-konva';
+import { Group, Rect, Line, Arrow } from 'react-konva';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 import type Konva from 'konva';
 import type { BarChartObject as BarChartObjectType } from '@/types/canvas';
 
@@ -65,7 +66,7 @@ export function BarChartObject({ obj, isSelected, onSelect, onChange }: Props) {
       {/* Y-axis label — Group rotates around (0, plotCentreY) so all coords stay >= 0 */}
       {yLabel && (
         <Group x={0} y={plotCentreY} rotation={-90} listening={false}>
-          <Text
+          <LatexLabel
             x={-plotH / 2}
             y={2}
             width={plotH}
@@ -90,7 +91,7 @@ export function BarChartObject({ obj, isSelected, onSelect, onChange }: Props) {
               strokeWidth={style.strokeWidth * 0.75}
               listening={false}
             />
-            <Text
+            <LatexLabel
               x={style.fontSize + 4}
               y={ty - style.fontSize / 2}
               width={originX - style.fontSize - 10}
@@ -129,7 +130,7 @@ export function BarChartObject({ obj, isSelected, onSelect, onChange }: Props) {
               strokeWidth={style.strokeWidth}
               listening={false}
             />
-            <Text
+            <LatexLabel
               x={originX + i * slotW}
               y={originY + 5}
               width={slotW}
@@ -141,7 +142,7 @@ export function BarChartObject({ obj, isSelected, onSelect, onChange }: Props) {
               listening={false}
             />
             {showValues && (
-              <Text
+              <LatexLabel
                 x={bx}
                 y={by - style.fontSize - 2}
                 width={barW}
@@ -181,7 +182,7 @@ export function BarChartObject({ obj, isSelected, onSelect, onChange }: Props) {
 
       {/* X-axis label */}
       {xLabel && (
-        <Text
+        <LatexLabel
           x={originX}
           y={H - style.fontSize - 2}
           width={plotW}

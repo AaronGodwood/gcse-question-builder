@@ -1,4 +1,5 @@
 import { Text, Line, Arc } from 'react-konva';
+import { LatexLabel } from '@/components/builder/LatexLabel';
 import {
   centroid,
   flattenPoints,
@@ -33,7 +34,7 @@ export function ShapeLabels({ shape }: Props) {
     if (!a || !b) return;
     const pos = outwardNormal(a, b, c, 18);
     elements.push(
-      <Text
+      <LatexLabel
         key={`side-${side.id}`}
         x={pos.x - 20}
         y={pos.y - 8}
@@ -93,7 +94,7 @@ export function ShapeLabels({ shape }: Props) {
       const bisRad = (bisectorAngle * Math.PI) / 180;
       const labelDist = arcR + 10;
       elements.push(
-        <Text
+        <LatexLabel
           key={`anglabel-${angle.id}`}
           x={vertex.x + Math.cos(bisRad) * labelDist - 14}
           y={vertex.y + Math.sin(bisRad) * labelDist - 7}

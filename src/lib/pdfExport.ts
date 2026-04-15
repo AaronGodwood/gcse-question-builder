@@ -6,6 +6,8 @@ import type { CanvasData } from '@/types/canvas';
 import { toSuperscript } from '@/lib/cn';
 import { NOTO_SANS_NORMAL_B64, NOTO_SANS_BOLD_B64 } from '@/lib/notoSansFont';
 import { tickMarkPoints } from '@/lib/shapeGeometry';
+import { addLatexTextSync, preloadCanvasLatex, renderInlineLatexParagraph } from '@/lib/pdfLatex';
+import { hasLatex } from '@/lib/latex';
 
 // A4 dimensions in mm
 const A4_W = 210;
@@ -79,12 +81,40 @@ export async function generateWorksheetPDF(
       }
     }
 
-    // Estimate block height needed
-    const questionTextLines = pdf.setFontSize(SZ_BODY).splitTextToSize(
-      toSuperscript(q.question_text || ''), CONTENT_W - 14
-    ) as string[];
+    // Question text — either rasterise as an image (LaTeX path) or lay out
+    // as native PDF text (fast path). Estimate height for page-break logic.
+    const textX = MARGIN_LEFT + 10;
+    const textW = CONTENT_W - 14;
+    const qText = q.question_text || '';
+
+    let qTextMmH = 0;
+    let qTextImage: { dataUrl: string; pxWidth: number; pxHeight: number } | null = null;
+    let qTextLines: string[] = [];
+
+    const MARKS_RESERVE_MM = 22;
+    const qTextImgMmW = textW - MARKS_RESERVE_MM;
+
+    if (hasLatex(qText)) {
+      // CSS pixels → mm: 1mm = 96/25.4 px
+      const cssPxWidth = qTextImgMmW * (96 / 25.4);
+      qTextImage = await renderInlineLatexParagraph({
+        text: qText,
+        cssPxWidth,
+        fontSize: 14,      // chosen to roughly match SZ_BODY in mm
+        fontFamily: 'Arial, sans-serif',
+      });
+      if (qTextImage) {
+        qTextMmH = (qTextImage.pxHeight / (96 / 25.4));
+      }
+    } else {
+      qTextLines = pdf.setFontSize(SZ_BODY).splitTextToSize(
+        toSuperscript(qText), textW
+      ) as string[];
+      qTextMmH = qTextLines.length * 5.5;
+    }
+
     const answerLinesMm = qs.include_answer_space ? qs.answer_lines * 7 : 0;
-    const blockH = 8 + questionTextLines.length * 5.5 + (imgDataUrl ? imgMmH + 4 : 0) + answerLinesMm + 8;
+    const blockH = 8 + qTextMmH + (imgDataUrl ? imgMmH + 4 : 0) + answerLinesMm + 8;
 
     // Page break if needed
     if (y + blockH > A4_H - MARGIN_BOTTOM - 10) {
@@ -106,13 +136,15 @@ export async function generateWorksheetPDF(
     pdf.text(markStr, A4_W - MARGIN_RIGHT, y + 1, { align: 'right' });
 
     // Question text — indented
-    const textX = MARGIN_LEFT + 10;
-    const textW = CONTENT_W - 14;
     pdf.setFont(FONT_NORMAL, 'normal');
     pdf.setFontSize(SZ_BODY);
-    const lines = pdf.splitTextToSize(toSuperscript(q.question_text || ''), textW) as string[];
-    pdf.text(lines, textX, y + 1);
-    y += lines.length * 5.5 + 3;
+    if (qTextImage) {
+      pdf.addImage(qTextImage.dataUrl, 'PNG', textX, y - 2, qTextImgMmW, qTextMmH);
+      y += qTextMmH + 3;
+    } else {
+      pdf.text(qTextLines, textX, y + 1);
+      y += qTextLines.length * 5.5 + 3;
+    }
 
     // Canvas image — centred on the content area
     if (imgDataUrl && imgMmW > 0) {
@@ -277,10 +309,14 @@ function drawAnswerLines(pdf: jsPDF, startY: number, lines: number): number {
 
 // ─── Canvas → image ───────────────────────────────────────────────────────────
 
-async function renderCanvasToImage(
+export async function renderCanvasToImage(
   canvasData: CanvasData,
 ): Promise<{ dataUrl: string; width: number; height: number; cropW: number; cropH: number } | null> {
   if (canvasData.objects.length === 0) return null;
+
+  // Preload KaTeX renders for every LaTeX run in user labels so the sync
+  // render path below can pull them from the resolved cache.
+  await preloadCanvasLatex(canvasData);
 
   const SCALE = 2; // retina quality
   const PAD = 24;  // padding around tight bounding box (px at 1x)
@@ -367,7 +403,7 @@ async function renderObjectToLayer(obj: CanvasData['objects'][number], layer: Ko
     await renderGraphToGroup(obj as import('@/types/canvas').GraphObject, group);
   } else if (obj.type === 'text') {
     const t = obj as import('@/types/canvas').TextObject;
-    group.add(new Konva.Text({
+    addLatexTextSync(group, {
       x: 0, y: 0,
       text: t.content,
       fontSize: t.fontSize,
@@ -376,7 +412,7 @@ async function renderObjectToLayer(obj: CanvasData['objects'][number], layer: Ko
       fill: t.fill,
       align: t.textAlign,
       width: t.width,
-    }));
+    });
   } else if (obj.type === 'mark-box') {
     const m = obj as import('@/types/canvas').MarkBoxObject;
     group.add(new Konva.Rect({ x: 0, y: 0, width: m.width, height: m.height, fill: 'white', stroke: '#000', strokeWidth: 1.5 }));
@@ -424,7 +460,7 @@ async function renderShapeToGroup(shape: import('@/types/canvas').ShapeObject, g
   };
 
   const labelNode = (x: number, y: number, text: string) =>
-    group.add(new Konva.Text({ x: x - 30, y: y - 8, text, fontSize: 11, fontFamily: 'Arial', fill: col, align: 'center', width: 60 }));
+    addLatexTextSync(group, { x: x - 30, y: y - 8, text, fontSize: 11, fontFamily: 'Arial', fill: col, align: 'center', width: 60 });
 
   if (shapeType === 'circle') {
     const r = dimensions.radius ?? w / 2;
@@ -548,7 +584,7 @@ async function renderShapeToGroup(shape: import('@/types/canvas').ShapeObject, g
       const b = pts[(i + 1) % pts.length];
       if (!a || !b) return;
       const pos = outwardNormal(a, b, c, 18);
-      group.add(new Konva.Text({ x: pos.x - 20, y: pos.y - 8, text: side.label, fontSize: 11, fontFamily: 'Arial', fill: col, align: 'center', width: 40 }));
+      addLatexTextSync(group, { x: pos.x - 20, y: pos.y - 8, text: side.label, fontSize: 11, fontFamily: 'Arial', fill: col, align: 'center', width: 40 });
     });
 
     // Angle arcs + labels
@@ -576,7 +612,7 @@ async function renderShapeToGroup(shape: import('@/types/canvas').ShapeObject, g
         const bisectorAngle = anglePrev + sweep / 2;
         const bisRad = (bisectorAngle * Math.PI) / 180;
         const labelDist = arcR + 10;
-        group.add(new Konva.Text({ x: vertex.x + Math.cos(bisRad) * labelDist - 14, y: vertex.y + Math.sin(bisRad) * labelDist - 7, text: angle.label, fontSize: 10, fontFamily: 'Arial', fill: col, align: 'center', width: 28 }));
+        addLatexTextSync(group, { x: vertex.x + Math.cos(bisRad) * labelDist - 14, y: vertex.y + Math.sin(bisRad) * labelDist - 7, text: angle.label, fontSize: 10, fontFamily: 'Arial', fill: col, align: 'center', width: 28 });
       }
     });
 
@@ -692,12 +728,12 @@ function renderCircleDiagramToGroup(
       const bisectorAngle = anglePrev + sweep / 2;
       const bisRad = (bisectorAngle * Math.PI) / 180;
       const labelDist = arcR + 10;
-      group.add(new Konva.Text({
+      addLatexTextSync(group, {
         x: vertex.px + Math.cos(bisRad) * labelDist - 14,
         y: vertex.py + Math.sin(bisRad) * labelDist - 7,
         text: ang.label, fontSize: 11, fontFamily: 'Arial', fill: '#000',
         align: 'center', width: 28, listening: false,
-      }));
+      });
     }
   }
 
@@ -712,11 +748,11 @@ function renderCircleDiagramToGroup(
       const len = Math.sqrt(vx * vx + vy * vy) || 1;
       dx = (vx / len) * 16; dy = (vy / len) * 16;
     }
-    group.add(new Konva.Text({
+    addLatexTextSync(group, {
       x: px + dx - 7, y: py + dy - 7,
       text: pt.label, fontSize: 12, fontFamily: 'Arial',
       fontStyle: 'bold', fill: '#000', listening: false,
-    }));
+    });
     group.add(new Konva.Circle({ x: px, y: py, radius: 3, fill: '#000', listening: false }));
   }
 }
@@ -742,7 +778,7 @@ function renderTableToGroup(
       const shaded = cell?.shaded || (style.headerRow && r === 0) || (style.headerCol && c === 0);
       group.add(new Konva.Rect({ x, y, width: cw, height: rowHeight, fill: shaded ? '#d0d0d0' : '#ffffff', listening: false }));
       if (cell?.content) {
-        group.add(new Konva.Text({
+        addLatexTextSync(group, {
           x: x + 4, y,
           width: cw - 8, height: rowHeight,
           text: cell.content,
@@ -753,7 +789,7 @@ function renderTableToGroup(
           verticalAlign: 'middle',
           fill: '#000000',
           listening: false,
-        }));
+        });
       }
     }
   }
@@ -825,7 +861,7 @@ function renderNumberLineToGroup(
     const mx = toX(m.value);
     group.add(new Konva.Circle({ x: mx, y: lineY, radius: 6, fill: m.style === 'closed' ? style.stroke : 'white', stroke: style.stroke, strokeWidth: style.strokeWidth }));
     if (m.showLabel && m.label) {
-      group.add(new Konva.Text({ x: mx - 20, y: lineY - 24, width: 40, text: m.label, fontSize: style.fontSize, fontFamily: 'Arial', align: 'center', fill: style.stroke }));
+      addLatexTextSync(group, { x: mx - 20, y: lineY - 24, width: 40, text: m.label, fontSize: style.fontSize, fontFamily: 'Arial', align: 'center', fill: style.stroke });
     }
   }
 }
@@ -842,7 +878,7 @@ function renderVennDiagramToGroup(
   group.add(new Konva.Rect({ x: 2, y: 2, width: W - 4, height: H - 4, stroke: style.stroke, strokeWidth: style.strokeWidth * 0.75, fill: 'transparent' }));
 
   if (universalSet.show) {
-    group.add(new Konva.Text({ x: 6, y: 6, text: universalSet.label, fontSize: style.fontSize + 2, fontFamily: 'Arial', fontStyle: 'italic', fill: style.stroke }));
+    addLatexTextSync(group, { x: 6, y: 6, text: universalSet.label, fontSize: style.fontSize + 2, fontFamily: 'Arial', fontStyle: 'italic', fill: style.stroke });
   }
 
   // Circle fills
@@ -854,8 +890,8 @@ function renderVennDiagramToGroup(
   group.add(new Konva.Circle({ x: circleB.x, y: circleB.y, radius: circleB.r, fill: 'transparent', stroke: style.stroke, strokeWidth: style.strokeWidth }));
 
   // Labels above circles
-  group.add(new Konva.Text({ x: circleA.x - circleA.r, y: circleA.y - circleA.r - style.fontSize - 4, width: circleA.r * 2, text: circleA.label, fontSize: style.fontSize, fontFamily: 'Arial', fontStyle: 'italic bold', align: 'center', fill: style.stroke }));
-  group.add(new Konva.Text({ x: circleB.x - circleB.r, y: circleB.y - circleB.r - style.fontSize - 4, width: circleB.r * 2, text: circleB.label, fontSize: style.fontSize, fontFamily: 'Arial', fontStyle: 'italic bold', align: 'center', fill: style.stroke }));
+  addLatexTextSync(group, { x: circleA.x - circleA.r, y: circleA.y - circleA.r - style.fontSize - 4, width: circleA.r * 2, text: circleA.label, fontSize: style.fontSize, fontFamily: 'Arial', fontStyle: 'italic bold', align: 'center', fill: style.stroke });
+  addLatexTextSync(group, { x: circleB.x - circleB.r, y: circleB.y - circleB.r - style.fontSize - 4, width: circleB.r * 2, text: circleB.label, fontSize: style.fontSize, fontFamily: 'Arial', fontStyle: 'italic bold', align: 'center', fill: style.stroke });
 
   // Region labels
   const aOnlyX = circleA.x - circleA.r * 0.55;
@@ -864,10 +900,10 @@ function renderVennDiagramToGroup(
   const midY = (circleA.y + circleB.y) / 2;
 
   const rl = regionLabels;
-  if (rl.aOnly.show && rl.aOnly.text)        group.add(new Konva.Text({ x: aOnlyX - 24, y: midY - style.fontSize / 2, width: 48, text: rl.aOnly.text, fontSize: style.fontSize, fontFamily: 'Arial', align: 'center', fill: style.stroke }));
-  if (rl.intersection.show && rl.intersection.text) group.add(new Konva.Text({ x: interX - 24, y: midY - style.fontSize / 2, width: 48, text: rl.intersection.text, fontSize: style.fontSize, fontFamily: 'Arial', align: 'center', fill: style.stroke }));
-  if (rl.bOnly.show && rl.bOnly.text)        group.add(new Konva.Text({ x: bOnlyX - 24, y: midY - style.fontSize / 2, width: 48, text: rl.bOnly.text, fontSize: style.fontSize, fontFamily: 'Arial', align: 'center', fill: style.stroke }));
-  if (rl.outside.show && rl.outside.text)    group.add(new Konva.Text({ x: 12, y: 14 + style.fontSize + 4, text: rl.outside.text, fontSize: style.fontSize, fontFamily: 'Arial', fill: style.stroke }));
+  if (rl.aOnly.show && rl.aOnly.text)        addLatexTextSync(group, { x: aOnlyX - 24, y: midY - style.fontSize / 2, width: 48, text: rl.aOnly.text, fontSize: style.fontSize, fontFamily: 'Arial', align: 'center', fill: style.stroke });
+  if (rl.intersection.show && rl.intersection.text) addLatexTextSync(group, { x: interX - 24, y: midY - style.fontSize / 2, width: 48, text: rl.intersection.text, fontSize: style.fontSize, fontFamily: 'Arial', align: 'center', fill: style.stroke });
+  if (rl.bOnly.show && rl.bOnly.text)        addLatexTextSync(group, { x: bOnlyX - 24, y: midY - style.fontSize / 2, width: 48, text: rl.bOnly.text, fontSize: style.fontSize, fontFamily: 'Arial', align: 'center', fill: style.stroke });
+  if (rl.outside.show && rl.outside.text)    addLatexTextSync(group, { x: 12, y: 14 + style.fontSize + 4, text: rl.outside.text, fontSize: style.fontSize, fontFamily: 'Arial', fill: style.stroke });
 }
 
 function renderProbTreeToGroup(
@@ -931,18 +967,18 @@ function renderProbTreeToGroup(
       const perpX = -dy / len, perpY = dx / len;
       const sign = perpY > 0 ? -1 : 1;
       const LABEL_OFFSET = style.fontSize + 3;
-      group.add(new Konva.Text({ x: mx + sign * perpX * LABEL_OFFSET - 24, y: my + sign * perpY * LABEL_OFFSET - style.fontSize / 2, width: 48, text: node.probability, fontSize: style.fontSize, fontFamily: 'Arial', fill: style.stroke, align: 'center' }));
+      addLatexTextSync(group, { x: mx + sign * perpX * LABEL_OFFSET - 24, y: my + sign * perpY * LABEL_OFFSET - style.fontSize / 2, width: 48, text: node.probability, fontSize: style.fontSize, fontFamily: 'Arial', fill: style.stroke, align: 'center' });
     }
 
     if (node.label) {
-      group.add(new Konva.Text({ x: to.x - 20, y: to.y - style.fontSize - NODE_R - 3, width: 40, text: node.label, fontSize: style.fontSize, fontFamily: 'Arial', fontStyle: 'bold', fill: style.stroke, align: 'center' }));
+      addLatexTextSync(group, { x: to.x - 20, y: to.y - style.fontSize - NODE_R - 3, width: 40, text: node.label, fontSize: style.fontSize, fontFamily: 'Arial', fontStyle: 'bold', fill: style.stroke, align: 'center' });
     }
 
     const isLeaf = (childrenOf.get(node.id) ?? []).length === 0;
     if (isLeaf) {
       const outcomeX = W - PAD_R + 4;
       if (showOutcomes && node.outcome) {
-        group.add(new Konva.Text({ x: outcomeX, y: to.y - style.fontSize / 2, width: PAD_R - 6, text: node.outcome, fontSize: style.fontSize, fontFamily: 'Arial', fill: style.stroke }));
+        addLatexTextSync(group, { x: outcomeX, y: to.y - style.fontSize / 2, width: PAD_R - 6, text: node.outcome, fontSize: style.fontSize, fontFamily: 'Arial', fill: style.stroke });
       }
       if (showProducts) {
         const probs: string[] = [];
@@ -982,7 +1018,7 @@ function renderBearingToGroup(
   if (showNorthLine) {
     group.add(new Konva.Line({ points: [cx, cy, cx, cy - northLen], stroke: style.stroke, strokeWidth: style.strokeWidth }));
     group.add(new Konva.Line({ points: [cx - 5, cy - northLen + 8, cx, cy - northLen, cx + 5, cy - northLen + 8], stroke: style.stroke, strokeWidth: style.strokeWidth }));
-    group.add(new Konva.Text({ x: cx - 12, y: cy - northLen - style.fontSize - 4, width: 24, text: northLabel, fontSize: style.fontSize + 1, fontFamily: 'Arial', fontStyle: 'bold', fill: style.stroke, align: 'center' }));
+    addLatexTextSync(group, { x: cx - 12, y: cy - northLen - style.fontSize - 4, width: 24, text: northLabel, fontSize: style.fontSize + 1, fontFamily: 'Arial', fontStyle: 'bold', fill: style.stroke, align: 'center' });
   }
 
   if (showBearingLine) {
@@ -1007,7 +1043,7 @@ function renderBearingToGroup(
     const lx = cx + Math.cos(midBearingRad) * labelR;
     const ly = cy + Math.sin(midBearingRad) * labelR;
     const label = bearingLabel || `${String(bearing).padStart(3, '0')}°`;
-    group.add(new Konva.Text({ x: lx - 20, y: ly - style.fontSize / 2, width: 40, text: label, fontSize: style.fontSize, fontFamily: 'Arial', fill: style.stroke, align: 'center' }));
+    addLatexTextSync(group, { x: lx - 20, y: ly - style.fontSize / 2, width: 40, text: label, fontSize: style.fontSize, fontFamily: 'Arial', fill: style.stroke, align: 'center' });
   }
 
   // Origin cross
@@ -1041,11 +1077,11 @@ function renderBarChartToGroup(
   // Y-axis label — rotated via sub-group so coordinates stay non-negative
   if (yLabel) {
     const yLabelGroup = new Konva.Group({ x: 0, y: plotCentreY, rotation: -90 });
-    yLabelGroup.add(new Konva.Text({
+    addLatexTextSync(yLabelGroup, {
       x: -plotH / 2, y: 2, width: plotH,
       text: yLabel, fontSize: style.fontSize, fontFamily: 'Arial',
       fill: style.axisColor, align: 'center',
-    }));
+    });
     group.add(yLabelGroup);
   }
 
@@ -1067,7 +1103,7 @@ function renderBarChartToGroup(
     const by = toY(bar.value);
     const bh = originY - by;
     group.add(new Konva.Rect({ x: bx, y: by, width: bW, height: bh, fill: bar.color || barColor, stroke: style.stroke, strokeWidth: style.strokeWidth }));
-    group.add(new Konva.Text({ x: originX + i * slotW, y: originY + 5, width: slotW, text: bar.label, fontSize: style.fontSize, fontFamily: 'Arial', fill: style.axisColor, align: 'center' }));
+    addLatexTextSync(group, { x: originX + i * slotW, y: originY + 5, width: slotW, text: bar.label, fontSize: style.fontSize, fontFamily: 'Arial', fill: style.axisColor, align: 'center' });
     if (showValues) {
       group.add(new Konva.Text({ x: bx, y: by - style.fontSize - 2, width: bW, text: String(bar.value), fontSize: style.fontSize, fontFamily: 'Arial', fill: style.axisColor, align: 'center' }));
     }
@@ -1077,7 +1113,7 @@ function renderBarChartToGroup(
   group.add(new Konva.Line({ points: [originX, originY, originX, PAD_TOP], stroke: style.axisColor, strokeWidth: style.strokeWidth }));
   group.add(new Konva.Line({ points: [originX, originY, originX + plotW + 8, originY], stroke: style.axisColor, strokeWidth: style.strokeWidth }));
 
-  if (xLabel) group.add(new Konva.Text({ x: originX, y: H - style.fontSize - 2, width: plotW, text: xLabel, fontSize: style.fontSize, fontFamily: 'Arial', fill: style.axisColor, align: 'center' }));
+  if (xLabel) addLatexTextSync(group, { x: originX, y: H - style.fontSize - 2, width: plotW, text: xLabel, fontSize: style.fontSize, fontFamily: 'Arial', fill: style.axisColor, align: 'center' });
 }
 
 function renderPieChartToGroup(
@@ -1093,7 +1129,7 @@ function renderPieChartToGroup(
   const r = Math.min(W, H - titleH) / 2 - 16;
 
   if (showTitle) {
-    group.add(new Konva.Text({ x: 0, y: 4, width: W, text: title, fontSize: style.fontSize + 1, fontFamily: 'Arial', fontStyle: 'bold', fill: style.stroke, align: 'center' }));
+    addLatexTextSync(group, { x: 0, y: 4, width: W, text: title, fontSize: style.fontSize + 1, fontFamily: 'Arial', fontStyle: 'bold', fill: style.stroke, align: 'center' });
   }
 
   const total = slices.reduce((s, sl) => s + sl.value, 0);
@@ -1127,7 +1163,7 @@ function renderPieChartToGroup(
       const edgeY = cy + Math.sin(midAngleRad) * (r + 2);
       group.add(new Konva.Line({ points: [edgeX, edgeY, lx, ly], stroke: style.stroke, strokeWidth: 0.8 }));
       const parts = [sl.showLabel ? sl.label : '', sl.showAngle ? `${Math.round(toDeg(sl.value))}°` : ''].filter(Boolean);
-      group.add(new Konva.Text({ x: lx - 24, y: ly - style.fontSize / 2, width: 48, text: parts.join(' '), fontSize: style.fontSize, fontFamily: 'Arial', fill: style.stroke, align: 'center' }));
+      addLatexTextSync(group, { x: lx - 24, y: ly - style.fontSize / 2, width: 48, text: parts.join(' '), fontSize: style.fontSize, fontFamily: 'Arial', fill: style.stroke, align: 'center' });
     }
 
     cumulative += angleDeg;
@@ -1201,11 +1237,11 @@ async function renderGraphToGroup(graph: import('@/types/canvas').GraphObject, g
               (u) => Math.abs(u.px - px) < LABEL_MIN_GAP && Math.abs(u.py - py) < LABEL_MIN_GAP
             );
             if (!tooClose) {
-              inner.add(new Konva.Text({
+              addLatexTextSync(inner, {
                 x: px + 4, y: py - 18,
                 text: plot.label || plot.equation,
                 fontSize: 10, fontFamily: 'Arial', fill: plot.color, listening: false,
-              }));
+              });
               usedLabelPositions.push({ px, py });
               break;
             }
@@ -1222,11 +1258,11 @@ async function renderGraphToGroup(graph: import('@/types/canvas').GraphObject, g
       const { px } = toPixel(parsed.verticalX, 0);
       inner.add(new Konva.Line({ points: [px, PAD, px, PAD + innerH], ...strokeProps }));
       if (plot.showLabel) {
-        inner.add(new Konva.Text({
+        addLatexTextSync(inner, {
           x: px + 4, y: PAD + 8,
           text: `x = ${parsed.verticalX}`,
           fontSize: 10, fontFamily: 'Arial', fill: plot.color, listening: false,
-        }));
+        });
       }
     }
   }
